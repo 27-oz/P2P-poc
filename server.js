@@ -17,22 +17,21 @@ io.on("connection", (socket) => {
 
   socket.on("injectIntent", async (intent) => {
     console.log("Intent Received:", intent);
-    
-    // THE BRAIN: Gemini processes the intent
-    const prompt = `You are the Chimera OS Brain. The user intent is: "${intent}". 
-    If this requires a Windows command, respond ONLY with the command prefixed with "CMD:". 
-    If it's a question, answer concisely. Windows is connected.`;
+    const prompt = `You are the Chimera OS Brain. User intent: "${intent}". 
+    If this requires a Windows command, respond "WIN:command". 
+    If it requires a Termux command, respond "TRM:command". 
+    Otherwise, just chat.`;
 
     try {
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
 
-        if (responseText.startsWith("CMD:")) {
-            const code = responseText.replace("CMD:", "").trim();
-            if(chimeraState.nodes["WINDOWS_NODE"]) {
-                io.to(chimeraState.nodes["WINDOWS_NODE"].id).emit("runCode", code);
-                io.emit("status", `Brain executing: ${code}`);
-            }
+        if (responseText.startsWith("WIN:")) {
+            const code = responseText.replace("WIN:", "").trim();
+            if(chimeraState.nodes["WINDOWS_NODE"]) io.to(chimeraState.nodes["WINDOWS_NODE"].id).emit("runCode", code);
+        } else if (responseText.startsWith("TRM:")) {
+            const code = responseText.replace("TRM:", "").trim();
+            if(chimeraState.nodes["TERMUX_NODE"]) io.to(chimeraState.nodes["TERMUX_NODE"].id).emit("runCode", code);
         } else {
             io.emit("message", { user: "CHIMERA_AI", text: responseText });
         }
@@ -42,8 +41,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("execute", (data) => {
-    if(chimeraState.nodes["WINDOWS_NODE"]) {
-        io.to(chimeraState.nodes["WINDOWS_NODE"].id).emit("runCode", data.code);
+    if(chimeraState.nodes[data.target]) {
+        io.to(chimeraState.nodes[data.target].id).emit("runCode", data.code);
     }
   });
 
