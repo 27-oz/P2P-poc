@@ -3,32 +3,30 @@ const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http, { cors: { origin: "*" } });
 
-let chimeraState = {
-  nodes: {}, 
-  lastCommand: null,
-  logs: []
-};
+let chimeraState = { nodes: {} };
 
 io.on("connection", (socket) => {
   socket.on("nodeSync", (data) => {
-    chimeraState.nodes[data.nodeType] = {
-      id: socket.id,
-      stats: data.stats,
-      lastSeen: new Date().toLocaleTimeString()
-    };
-    console.log(`Node Synced: ${data.nodeType}`);
-    io.emit("stateUpdate", chimeraState);
+    chimeraState.nodes[data.nodeType] = { id: socket.id };
+    console.log(`Node Connected: ${data.nodeType}`);
   });
 
   socket.on("injectIntent", (intent) => {
-    console.log("New Intent:", intent);
+    // This is where Gemini will eventually live. For now, it just logs.
+    console.log("Intent Received:", intent);
     io.emit("status", `Processing intent: ${intent}`);
   });
 
   socket.on("execute", (data) => {
-    if(chimeraState.nodes[data.target]) {
-        io.to(chimeraState.nodes[data.target].id).emit("runCode", data.code);
+    if(chimeraState.nodes["WINDOWS_NODE"]) {
+        io.to(chimeraState.nodes["WINDOWS_NODE"].id).emit("runCode", data.code);
     }
+  });
+
+  // THIS IS THE FIX: It catches the output from Windows and sends it to Termux
+  socket.on("chatMessage", (data) => {
+    console.log("Relaying result...");
+    socket.broadcast.emit("message", data); 
   });
 
   socket.on("disconnect", () => {
@@ -39,4 +37,4 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log("Chimera Core Active"));
+http.listen(PORT, () => console.log("Chimera Core Live"));
